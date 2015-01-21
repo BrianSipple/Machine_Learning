@@ -25,6 +25,8 @@ def prettyPicture(clf, X_test, y_test):
     Z = Z.reshape(xx.shape)
     plt.xlim(xx.min(), xx.max())
     plt.ylim(yy.min(), yy.max())
+    plt.xticks()
+    plt.yticks()
 
     plt.pcolormesh(xx, yy, Z, cmap=pl.cm.seismic)
 
