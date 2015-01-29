@@ -32,6 +32,7 @@ dt_stump = DecisionTreeClassifier(max_depth=1, min_samples_leaf=1)
 dt_stump.fit(X, Y)
 dt_stump_error = 1.0 - dt_stump.score(features_test, labels_test)
 
+print "Error computed for dt_stump: {}".format(dt_stump_error)
 
 ada_discrete = AdaBoostClassifier(
     n_estimators=n_estimators,
@@ -41,31 +42,34 @@ ada_discrete = AdaBoostClassifier(
 )
 ada_discrete.fit(X, Y)
 
-# Compute error for each of the estimators
+# Compute test error for each of the estimators
 ada_discrete_error = np.zeros((n_estimators,))
-for i, y_pred in enumerate(ada_discrete.staged_predict(features_train)):
-    ada_discrete_error[i] = zero_one_loss(y_pred, labels_train)
-
-# Compute error over the training set
-ada_discrete_error_train = np.zeros((n_estimators,))
 for i, y_pred in enumerate(ada_discrete.staged_predict(features_test)):
-    ada_discrete_error_train[i] = zero_one_loss(y_pred, labels_test)
+    ada_discrete_error[i] = zero_one_loss(y_pred, labels_test)
+
+print "Training error computed for AdaBoost Discrete: {}".format(ada_discrete_error)
 
 
+# Compute training error for each of the estimators
+ada_discrete_error_train = np.zeros((n_estimators,))
+for i, y_pred in enumerate(ada_discrete.staged_predict(features_train)):
+    ada_discrete_error_train[i] = zero_one_loss(y_pred, labels_train)
+
+print "Testing error computed for AdaBoost Discrete: {}".format(ada_discrete_error_train)
 
 
-#scores = cross_val_score(clf, )
-clf.fit(X, Y)
-
-predictions = clf.predict(features_test)
-
-from sklearn.metrics import accuracy_score
-
-accuracy = accuracy_score(predictions, labels_test)
-
-print "AdaBoost Accuracy -- \n" + \
-      "Number of classifiers: {}\n" + \
-      "Score: {}".format(
-        clf.n_estimators,
-        accuracy
-      )
+# #scores = cross_val_score(clf, )
+# clf.fit(X, Y)
+#
+# predictions = clf.predict(features_test)
+#
+# from sklearn.metrics import accuracy_score
+#
+# accuracy = accuracy_score(predictions, labels_test)
+#
+# print "AdaBoost Accuracy -- \n" + \
+#       "Number of classifiers: {}\n" + \
+#       "Score: {}".format(
+#         clf.n_estimators,
+#         accuracy
+#       )
