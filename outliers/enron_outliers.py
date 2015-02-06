@@ -13,4 +13,4 @@ features = ["salary", "bonus"]
 data = featureFormat(data_dict, features)
 
 
-### your code below
+### TODO: Run against outlier cleaning method
