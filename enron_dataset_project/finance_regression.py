@@ -11,6 +11,9 @@ import numpy as np
 import math
 import sys
 import pickle
+
+from sklearn.cross_validation import train_test_split
+
 sys.path.append("../tools/")
 
 
@@ -39,18 +42,21 @@ def percentile(N, percent, key=lambda x:x):
 def create_regression_for_feature_outcome_pair(feature, outcome):
 
     from feature_format import featureFormat, targetFeatureSplit
-    dictionary = pickle.load( open("data/enron_dataset_modified.pkl", "r") )
+    dictionary = pickle.load( open("data/enron_dataset.pkl", "r") )
 
     ### list the features you want to look at--first item in the
     ### list will be the "target" feature
-    data = featureFormat( dictionary, [outcome, feature], remove_any_zeroes=True)#, "long_term_incentive"], remove_any_zeroes=True )
+
+    #data = featureFormat( dictionary, [outcome, feature], remove_any_zeroes=True)#, "long_term_incentive"], remove_any_zeroes=True )
+
+    data = featureFormat(dictionary, [outcome, feature])
     target, features = targetFeatureSplit( data )
 
     ### training-testing split needed in regression, just like classification
-    from sklearn.cross_validation import train_test_split
     feature_train, feature_test, target_train, target_test = train_test_split(features, target, test_size=0.5, random_state=42)
 
     return feature_train, feature_test, target_train, target_test
+
 
 
 def classify(feature_train, target_train):
@@ -91,41 +97,53 @@ def make_plot(feature_train, target_train, feature_test, target_test, classifier
     plt.show()
 
 
-def clean_outliers(feature_train, feature_test, target_train, target_test, classifier):
+def process_outliers(outliers, feature_attr_name, target_attr_name):
+    """
+    As we're computing and cleaning outliers,
+    we can still gain valuable insights by processing
+    those values in various ways
+    """
+    outlier_names = []
 
-    x_y_pairs = zip(feature_test, target_test)
-    sq_errors = [ (classifier.predict(x[0]) - y)**2 for x, y, in x_y_pairs ]
-    mse = np.mean(sq_errors)
+    outlier_features, outlier_targets = zip(*outliers)[0:2]
 
-    #print "MSE: {}".format(mse)
+    dictionary = pickle.load(open('data/enron_dataset.pkl', 'r'))
 
-    residuals = [ (classifier.predict(x) - mse)**2 for x, y in x_y_pairs ]
-    residuals = sorted(residuals)
+    for i in range(len(outlier_features)):
+        for person_entry in dictionary:
+            if dictionary[person_entry].get(feature_attr_name) == outlier_features[i]:
+                outlier_names.append(person_entry)
 
-    #print "Residuals: {}".format(residuals)
+    print outlier_names
 
-    indicies_to_keep = []
-    thresh = percentile(residuals, .90)
 
-    for i in range(len(residuals)):
-        if residuals[i] < thresh:
-            indicies_to_keep.append(i)
 
-    #print "Indices to keep: {}".format(indicies_to_keep)
 
-    new_feature_train = []
-    new_feature_test = []
-    new_target_train = []
-    new_target_test = []
 
-    for j in range(len(indicies_to_keep)):
-        new_feature_train.append(feature_train[indicies_to_keep[j]])
-        new_feature_test.append(feature_test[indicies_to_keep[j]])
-        new_target_train.append(target_train[indicies_to_keep[j]])
-        new_target_test.append(target_test[indicies_to_keep[j]])
+def clean_outliers(predictions, feature_values, target_values, feature_attr_name, target_attr_name):
 
-    return new_feature_train, new_feature_test, new_target_train, new_target_test
+    x_y_pairs = zip(feature_values, target_values)
+    pred_outcome_pairs = zip(predictions, target_values)
 
+    errors = abs(predictions - target_values)
+    cleaned_data = zip(feature_values, target_values, errors)
+
+    ###sort the uncleaned data by error
+    cleaned_data.sort(key=lambda tup: tup[2])
+
+    ## Remove values with top 10% of errors
+    cutoff = int(math.floor(len(cleaned_data) * .90))
+
+    outliers = cleaned_data[cutoff:]
+    process_outliers(outliers, feature_attr_name, target_attr_name)
+
+    cleaned_data = cleaned_data[:cutoff]
+
+    print len(feature_values)
+    print len(cleaned_data)
+    #print (cleaned_data)
+
+    return cleaned_data
 
 
 
@@ -171,19 +189,27 @@ if __name__ == "__main__":
     ### we can remove the training items with the top 10% of residual error,
     ### and retrain.
 
-    new_feature_train, new_feature_test, new_target_train, new_target_test = clean_outliers(
+    cleaned_data = clean_outliers(
+        reg.predict(feature_train),
         feature_train,
-        feature_test,
         target_train,
-        target_test,
-        reg
+        feature_attr_name=feature,
+        target_attr_name=outcome
     )
 
-    # print new_feature_train
-    # print new_feature_test
-    # print new_target_train
-    # print new_target_test
 
+    if len(cleaned_data) >= 0:
+        new_feature_data, new_target_data, errors = zip(*cleaned_data)
+        new_feature_data = np.reshape(np.array(new_feature_data), (len(new_feature_data), 1))
+        new_target_data = np.reshape(np.array(new_target_data), (len(new_target_data), 1))
+
+
+    new_feature_train, new_feature_test, new_target_train, new_target_test = train_test_split(
+        new_feature_data,
+        new_target_data,
+        test_size=0.5,
+        random_state=42
+    )
 
     reg = classify(new_feature_train, new_target_train)
     slope = reg.coef_[0]
@@ -192,10 +218,10 @@ if __name__ == "__main__":
     train_score = reg.score(new_feature_train, new_target_train)
     test_score = reg.score(new_feature_test, new_target_test)
 
-    print "Slope: {}".format(slope)
-    print "Intercept: {}".format(intercept)
+    print "Slope, after cleaning outliers: {}".format(slope)
+    print "Intercept, after cleaning outliers: {}".format(intercept)
     #print "Mean Squared Error: {}".format(mse)
-    print "Prediction Score on training data: {}".format(train_score)
-    print "Prediction Score on testing data: {}".format(test_score)
+    print "Prediction Score on training data, after cleaning outliers: {}".format(train_score)
+    print "Prediction Score on testing data, after cleaning outliers: {}".format(test_score)
 
-    make_plot(new_feature_train, new_target_train, new_feature_test, new_target_test, reg, feature, outcome)
+    #make_plot(new_feature_train, new_target_train, new_feature_test, new_target_test, reg, feature, outcome)
