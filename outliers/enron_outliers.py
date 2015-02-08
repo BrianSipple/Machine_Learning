@@ -4,7 +4,7 @@ import pickle
 import sys
 import matplotlib.pyplot
 sys.path.append("../tools/")
-from feature_format import featureFormat, targetFeatureSplit
+from feature_format import featureFormat, labelFeatureSplit
 
 
 ### read in data dictionary, convert to numpy array
